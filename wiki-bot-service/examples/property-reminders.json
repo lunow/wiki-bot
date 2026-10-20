@@ -1,0 +1,8 @@
+[
+  {"name": "weekly", "cron": "0 9 * * mon", "title": "Weekly Property Digest",
+   "focus": "tasks due within 7 days, recurring weekly routines, imminent deadlines"},
+  {"name": "monthly", "cron": "0 9 1 * *", "title": "Monthly Property Digest",
+   "focus": "tasks due within 30 days, budget reviews, monthly maintenance checks"},
+  {"name": "seasonal", "cron": "0 9 1 3,6,9,12 *", "title": "Seasonal Property Digest",
+   "focus": "season-specific preparations and checks (spring/summer/autumn/winter tasks)"}
+]
