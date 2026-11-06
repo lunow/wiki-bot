@@ -404,8 +404,7 @@ async def startup():
 async def shutdown():
     scheduler.shutdown()
     await wiki_store.close()
-    if tg_bot:
-        await tg_bot.delete_webhook()
+    # Keep the webhook: on a rolling deploy this runs after the new container registered it
     track_event(distinct_id=0, event="bot_shutdown", properties={})
 
 
