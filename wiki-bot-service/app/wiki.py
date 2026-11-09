@@ -234,11 +234,13 @@ class WikiService:
         label: str = "Telegram note",
         attachments: Optional[Dict[str, bytes]] = None,
         extra_note_context: str = "",
+        author: str = "",
     ) -> Dict[str, List[str]]:
         """Merge a note into the wiki. Returns {"created": [...], "updated": [...], "source": path}."""
         async with self._write_lock:  # snapshot -> commit must not interleave
             now = self.now()
             today = now.strftime("%Y-%m-%d")
+            by = f" from {author}" if author else ""
             stamp = now.strftime("%Y%m%d-%H%M%S")
             snap = await self.store.snapshot()
 
@@ -293,16 +295,20 @@ class WikiService:
             # 3. the raw note, kept verbatim as a Source page (optional)
             files: Dict[str, Union[str, bytes]] = {}
             source_entry = None
+            source_desc = f"Raw {label.lower()}{by} received on {today}."
             if self.save_raw_notes:
+                source_meta = {
+                    "type": "Source",
+                    "title": f"{label} {today}",
+                    "description": source_desc,
+                    "tags": ["telegram", "captured"],
+                    "timestamp": now.isoformat(),
+                }
+                if author:
+                    source_meta["author"] = author
                 source_page = render_page(
-                    {
-                        "type": "Source",
-                        "title": f"{label} {today}",
-                        "description": f"Raw {label.lower()} received on {today}.",
-                        "tags": ["telegram", "captured"],
-                        "timestamp": now.isoformat(),
-                    },
-                    f"Captured {today}. Content below is verbatim; do not edit.\n\n---\n\n{note}",
+                    source_meta,
+                    f"Captured {today}{by}. Content below is verbatim; do not edit.\n\n---\n\n{note}",
                 )
                 files[f"wiki/{source_rel}"] = source_page
                 source_entry = {
@@ -341,7 +347,7 @@ class WikiService:
 
             if self.save_raw_notes:
                 index_entries.append(
-                    ("references", source_rel, f"{label} {today}", f"Raw {label.lower()} received on {today}.")
+                    ("references", source_rel, f"{label} {today}", source_desc)
                 )
 
             # 5. bookkeeping: index.md + log.md
@@ -352,7 +358,7 @@ class WikiService:
                 ([f"created {', '.join('/' + p[5:] for p in created)}"] if created else [])
                 + ([f"updated {', '.join('/' + p[5:] for p in updated)}"] if updated else [])
             )
-            files[LOG] = update_log(log_md, f"**Ingest** {label}{f' → /{source_rel}' if self.save_raw_notes else ''} — {summary}", today)
+            files[LOG] = update_log(log_md, f"**Ingest** {label}{by}{f' → /{source_rel}' if self.save_raw_notes else ''} — {summary}", today)
 
             # 6. one atomic commit (page images etc. ride along)
             if attachments:

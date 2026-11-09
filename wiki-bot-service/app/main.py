@@ -176,7 +176,18 @@ async def handle_query(chat_id: int, text: str):
     )
 
 
-async def handle_ingest(chat_id: int, text: str, *, attachments=None, label="Telegram note", extra=""):
+def sender_name(user: dict | None) -> str:
+    """Telegram sender as 'First Last (@username)', for provenance in the wiki."""
+    if not user:
+        return ""
+    name = " ".join(p for p in (user.get("first_name"), user.get("last_name")) if p).strip()
+    username = user.get("username")
+    if name and username:
+        return f"{name} (@{username})"
+    return name or (f"@{username}" if username else "")
+
+
+async def handle_ingest(chat_id: int, text: str, *, attachments=None, label="Telegram note", extra="", author=""):
     """Merge a note into the wiki and commit it."""
     check_auth(chat_id)
     track_event(
@@ -186,7 +197,7 @@ async def handle_ingest(chat_id: int, text: str, *, attachments=None, label="Tel
     )
     try:
         result = await wiki.ingest(
-            chat_id, text, label=label, attachments=attachments, extra_note_context=extra
+            chat_id, text, label=label, attachments=attachments, extra_note_context=extra, author=author
         )
     except IngestError as e:
         track_event(distinct_id=chat_id, event="ingest_rejected", properties=error_props(e))
@@ -208,7 +219,7 @@ async def handle_ingest(chat_id: int, text: str, *, attachments=None, label="Tel
     await send_message(chat_id, "\n".join(lines))
 
 
-async def handle_photo(chat_id: int, photo_sizes: list, caption: str | None):
+async def handle_photo(chat_id: int, photo_sizes: list, caption: str | None, author: str = ""):
     """Download photo; commit image + wiki pages in one commit."""
     check_auth(chat_id)
     track_event(
@@ -234,7 +245,8 @@ async def handle_photo(chat_id: int, photo_sizes: list, caption: str | None):
             "do not guess the photo's contents.)"
         )
         await handle_ingest(
-            chat_id, note, attachments={image_path: file_bytes}, label="Telegram photo", extra=extra
+            chat_id, note, attachments={image_path: file_bytes}, label="Telegram photo", extra=extra,
+            author=author,
         )
     except Exception as e:
         logger.error(f"Photo handling failed: {e}")
@@ -246,7 +258,7 @@ async def handle_photo(chat_id: int, photo_sizes: list, caption: str | None):
         await send_message(chat_id, f"❌ Sorry, I couldn't process the photo: {e}")
 
 
-async def handle_voice(chat_id: int, voice: dict):
+async def handle_voice(chat_id: int, voice: dict, author: str = ""):
     """Download voice, transcribe with Whisper, then route as text message."""
     check_auth(chat_id)
     file_id = voice["file_id"]
@@ -301,7 +313,7 @@ async def handle_voice(chat_id: int, voice: dict):
         if intent == "QUERY":
             await handle_query(chat_id, transcribed)
         elif intent == "INGEST":
-            await handle_ingest(chat_id, transcribed)
+            await handle_ingest(chat_id, transcribed, label="Telegram voice note", author=author)
         else:
             await handle_unclear(chat_id, transcribed)
 
@@ -429,6 +441,7 @@ async def process_update(data: dict):
         photo = msg.get("photo", [])
         voice = msg.get("voice")
         caption = msg.get("caption")
+        author = sender_name(msg.get("from"))
 
         if not chat_id:
             return
@@ -455,10 +468,10 @@ async def process_update(data: dict):
             return
 
         if voice:
-            await handle_voice(chat_id, voice)
+            await handle_voice(chat_id, voice, author)
             return
         if photo:
-            await handle_photo(chat_id, photo, caption)
+            await handle_photo(chat_id, photo, caption, author)
             return
         if not text:
             return
@@ -480,7 +493,7 @@ async def process_update(data: dict):
         if intent == "QUERY":
             await handle_query(chat_id, text)
         elif intent == "INGEST":
-            await handle_ingest(chat_id, text)
+            await handle_ingest(chat_id, text, author=author)
         else:
             await handle_unclear(chat_id, text)
     except Exception as e:
