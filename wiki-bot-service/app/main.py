@@ -29,7 +29,7 @@ from .config import (
     ADMIN_TOKEN, ALLOWED_CHAT_IDS, BOT_NAME, GITHUB_BRANCH, GITHUB_REPO, GITHUB_TOKEN,
     INGEST_GUIDANCE, LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, MAX_FILE_BYTES, QUERY_GUIDANCE,
     REMINDERS, SAVE_RAW_NOTES, TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_URL, TZ, WEBHOOK_SECRET,
-    WHISPER_API_KEY, WIKI_DOMAIN,
+    WHISPER_API_KEY, WHISPER_BASE_URL, WHISPER_MODEL, WIKI_DOMAIN,
 )
 
 for _problem in cfg.validate():
@@ -49,6 +49,8 @@ llm = LLMClient(
     model=LLM_MODEL,
     site_name=BOT_NAME,
     whisper_api_key=WHISPER_API_KEY,
+    whisper_base_url=WHISPER_BASE_URL,
+    whisper_model=WHISPER_MODEL,
 )
 wiki = WikiService(
     wiki_store, llm, now_local, save_raw_notes=SAVE_RAW_NOTES,

@@ -10,7 +10,6 @@ A Telegram bot for an LLM-wiki in a GitHub repo. One deployment serves one wiki;
 | **Telegram bot token** | [@BotFather](https://t.me/botfather) → new bot. Use a separate bot per wiki. |
 | **GitHub fine-grained PAT** | https://github.com/settings/personal-access-tokens/new → only the wiki repo → `Contents`: Read and write |
 | **LLM API key** | https://openrouter.ai/keys (or any OpenAI-compatible endpoint) |
-| **OpenAI key** *(voice only)* | https://platform.openai.com/api-keys. OpenRouter keys do not work for Whisper. |
 | **PostHog key** *(optional)* | Project settings → Project API Key |
 | **A host** | Coolify or any Docker host with a public HTTPS domain |
 
@@ -127,7 +126,7 @@ Every event carries `instance` when `INSTANCE_NAME` is set, so one project can h
 | Reminders not firing | Invalid `REMINDERS` JSON (startup fails loudly), wrong `TZ`, or none configured |
 | GitHub errors | PAT lacks Contents read+write, wrong `GITHUB_REPO` / `GITHUB_BRANCH`, or branch protection blocks direct pushes |
 | LLM errors | Check the key and `LLM_BASE_URL` / `LLM_MODEL` |
-| Voice fails | `WHISPER_API_KEY` must be an OpenAI key |
+| Voice fails | Check `WHISPER_MODEL` exists on your endpoint; if `WHISPER_API_KEY` is set it must be an OpenAI key |
 | Wrong routing | Use the `ask:` / `save:` prefix, or tune `JEV_PROMPT` in `app/prompts.py` |
 | PostHog empty | Check `POSTHOG_API_KEY` and `POSTHOG_HOST` |
 

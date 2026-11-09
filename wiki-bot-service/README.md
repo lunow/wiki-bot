@@ -56,7 +56,8 @@ On Coolify, create one service per wiki from the same Git source and give each i
 | `GITHUB_BRANCH` | `main` | Branch to read and commit to |
 | `SAVE_RAW_NOTES` | `true` | Keep each raw note as a Source page in `references/` |
 | `LLM_BASE_URL` / `LLM_MODEL` | OpenRouter / `openai/gpt-4o-mini` | LLM endpoint and model |
-| `WHISPER_API_KEY` | — | OpenAI key, only for voice |
+| `WHISPER_API_KEY` | `LLM_API_KEY` | Voice uses the LLM key and endpoint by default; set an OpenAI key to use OpenAI directly |
+| `WHISPER_BASE_URL` / `WHISPER_MODEL` | `LLM_BASE_URL` / `openai/whisper-large-v3` | Transcription endpoint and model (`whisper-1` on OpenAI) |
 | `ADMIN_TOKEN` | — | Bearer token for `/trigger-remind/{name}` |
 | `REMINDERS` / `REMINDERS_FILE` | none | Reminder digests (below) |
 | `TZ` | `Europe/Berlin` | Timezone for schedules and dates |
@@ -94,7 +95,7 @@ app/config.py            all environment settings
 app/main.py              webhook, routing, handlers, scheduler
 app/wiki.py              index-first retrieval and ingest (OKF bookkeeping)
 app/github_client.py     Git Data API store (blob reads, atomic commits)
-app/llm_client.py        chat + Whisper
+app/llm_client.py        chat + transcription
 app/prompts.py           prompt templates ({domain}, {bot_name} filled from config)
 app/posthog_tracker.py   privacy-filtered analytics
 examples/                a sample deployment
@@ -119,5 +120,5 @@ curl -X POST localhost:8000/telegram -H "Content-Type: application/json" \
 | Webhook 403 | `TELEGRAM_WEBHOOK_SECRET` changed: restart so the webhook is re-registered |
 | Reminders not firing | Check `REMINDERS` JSON and `TZ`; startup fails loudly on invalid JSON |
 | GitHub errors | PAT lacks Contents read+write, or `GITHUB_REPO` / `GITHUB_BRANCH` is wrong |
-| Voice fails | `WHISPER_API_KEY` must be an OpenAI key, not an OpenRouter key |
+| Voice fails | Check `WHISPER_MODEL` exists on your endpoint; if `WHISPER_API_KEY` is set it must be an OpenAI key |
 | Wrong routing | Use the `ask:` / `save:` prefix, or tune `JEV_PROMPT` |

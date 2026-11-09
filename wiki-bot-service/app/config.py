@@ -64,7 +64,16 @@ SAVE_RAW_NOTES = _bool("SAVE_RAW_NOTES", True)
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://openrouter.ai/api/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "openai/gpt-4o-mini")
-WHISPER_API_KEY = os.getenv("WHISPER_API_KEY") or LLM_API_KEY
+# Voice transcription. Default: the LLM endpoint and key (OpenRouter serves Whisper).
+# Setting WHISPER_API_KEY alone switches to OpenAI directly.
+_WHISPER_KEY = os.getenv("WHISPER_API_KEY", "")
+WHISPER_API_KEY = _WHISPER_KEY or LLM_API_KEY
+WHISPER_BASE_URL = os.getenv("WHISPER_BASE_URL") or (
+    "https://api.openai.com/v1" if _WHISPER_KEY else LLM_BASE_URL
+)
+WHISPER_MODEL = os.getenv("WHISPER_MODEL") or (
+    "whisper-1" if "api.openai.com" in WHISPER_BASE_URL else "openai/whisper-large-v3"
+)
 
 # ── Misc ────────────────────────────────────────────────────────────
 TZ = os.getenv("TZ", "Europe/Berlin")

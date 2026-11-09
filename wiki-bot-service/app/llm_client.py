@@ -14,14 +14,18 @@ class LLMClient:
         site_url: str = "",
         site_name: str = "Wiki Bot",
         whisper_api_key: Optional[str] = None,
+        whisper_base_url: Optional[str] = None,
+        whisper_model: str = "openai/whisper-large-v3",
     ):
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.site_url = site_url
         self.site_name = site_name
-        # Whisper uses OpenAI directly (not available on all OpenRouter models)
+        # Transcription: an OpenAI-compatible /audio/transcriptions endpoint (OpenRouter or OpenAI)
         self.whisper_api_key = whisper_api_key or api_key
+        self.whisper_base_url = (whisper_base_url or base_url).rstrip("/")
+        self.whisper_model = whisper_model
 
     def _headers(self) -> Dict[str, str]:
         h = {
@@ -86,24 +90,24 @@ class LLMClient:
         chat_id: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Transcribe audio using OpenAI Whisper. Track in PostHog."""
-        url = "https://api.openai.com/v1/audio/transcriptions"
+        """Transcribe audio with Whisper (OpenRouter or OpenAI). Track in PostHog."""
+        url = f"{self.whisper_base_url}/audio/transcriptions"
         headers = {
             "Authorization": f"Bearer {self.whisper_api_key}",
         }
         files = {
             "file": (filename, audio_bytes, "audio/ogg"),
-            "model": (None, "whisper-1"),
+            "model": (None, self.whisper_model),
         }
 
-        provider = "openai"
-        model = "whisper-1"
+        provider = "openrouter" if "openrouter" in self.whisper_base_url else "openai"
+        model = self.whisper_model
 
         with LLMTracker(
             chat_id=chat_id,
             model=model,
             provider=provider,
-            base_url="https://api.openai.com/v1",
+            base_url=self.whisper_base_url,
             metadata={**(metadata or {}), "transcription": True},
         ) as tracker:
             async with httpx.AsyncClient() as client:

@@ -36,7 +36,7 @@ One container. No database. All state lives in the GitHub repo.
 | **Raw notes optional** | `SAVE_RAW_NOTES` keeps each note as a Source page (provenance, verbatim text); turn it off for a leaner repo |
 | **JEV routing** | An LLM call classifies each message. `ask:` / `save:` prefixes skip it. UNCLEAR asks the user to use a prefix. |
 | **Reminders are configuration** | A JSON list of `{name, cron, focus, title}`; none by default |
-| **OpenRouter for LLM, OpenAI for Whisper** | One key for many models; OpenRouter has no audio transcription |
+| **OpenRouter for LLM and Whisper** | One key for chat and voice (`openai/whisper-large-v3` via `/audio/transcriptions`); `WHISPER_API_KEY` switches voice to OpenAI |
 | **GitHub as source of truth** | Everything versioned and reviewable |
 | **Privacy-filtered PostHog** | See Security |
 
@@ -70,7 +70,7 @@ Telegram update
 - Log levels for `httpx` / `httpcore` are raised so the bot token never appears in URLs in logs.
 - Files from Telegram are capped at 20 MB; the container runs as a non-root user; the port binds to `127.0.0.1`.
 - **PostHog:** chat IDs are HMAC-pseudonymised; person profiles and GeoIP are off; prompts and responses are redacted to sizes unless `POSTHOG_CAPTURE_CONTENT=true`; error messages reduce to class and HTTP status; an allowlist drops any other property.
-- Content still reaches the LLM provider, Whisper (voice) and GitHub. Choose providers and repo visibility accordingly; photos in the repo stay in its history.
+- Content still reaches the LLM provider, the Whisper host OpenRouter routes voice to, and GitHub. Choose providers and repo visibility accordingly; photos in the repo stay in its history.
 
 ## Cost (gpt-4o-mini, indicative)
 
@@ -80,7 +80,7 @@ Telegram update
 | Query | 1 page-selection call (wikis > 8 pages) + 1 answer call | ~$0.001 |
 | Ingest | 1 page-selection call (wikis > 8 pages) + 1 merge call | ~$0.002 |
 | Reminder | 1 selection call + 1 digest call per reminder | ~$0.001 |
-| Voice | Whisper | ~$0.006 / minute |
+| Voice | Whisper via OpenRouter | ~$0.0005–0.002 / minute (OpenAI direct: ~$0.006) |
 
 Cost no longer grows with the size of the wiki, only with the pages selected (capped at 60k characters).
 
@@ -96,7 +96,7 @@ Bot/
     │   ├── main.py            # webhook, routing, handlers, scheduler
     │   ├── wiki.py            # retrieval + ingest + index/log bookkeeping
     │   ├── github_client.py   # WikiStore: Git Data API reads/commits
-    │   ├── llm_client.py      # chat + Whisper
+    │   ├── llm_client.py      # chat + transcription
     │   ├── prompts.py         # templates filled from BOT_NAME / WIKI_DOMAIN
     │   └── posthog_tracker.py # pseudonymisation, allowlist, error scrubbing
     ├── examples/              # sample deployment (property wiki)
@@ -119,5 +119,5 @@ Not yet run end-to-end against live GitHub / Telegram / LLM services; logic is c
 - [ ] Vision model for photos (currently documented from the caption only)
 - [ ] Optional per-wiki lint (`wiki_lint.py`) run on a schedule
 - [ ] Configurable wiki folder name (fixed to `wiki/` today)
-- [ ] Lifespan handlers instead of `on_event`; Whisper key fallback cleanup
+- [ ] Lifespan handlers instead of `on_event`
 - [ ] One process serving several wikis (today: one container each)
