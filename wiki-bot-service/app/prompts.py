@@ -75,6 +75,19 @@ For each page you create or update, output exactly:
 === FILE: wiki/<dir>/<slug>.md ===
 <complete page content: frontmatter then body>
 
+Every page starts with its frontmatter between two `---` lines, for example:
+=== FILE: wiki/entities/example-org.md ===
+---
+type: Entity
+title: Example Org
+description: One sentence about Example Org.
+tags: [organisation]
+---
+
+# Example Org
+
+Body text in Markdown.
+
 No code fences, no commentary outside the file blocks."""
 
 JEV_PROMPT = """You are the intent classifier for a Telegram bot about {domain}.

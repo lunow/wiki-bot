@@ -30,6 +30,8 @@ MAX_CONTEXT_CHARS = 60_000
 MAX_INGEST_PAGES = 6
 NEW_PAGE_RE = re.compile(r"^wiki/(entities|concepts|syntheses)/[a-z0-9][a-z0-9-]{0,80}\.md$")
 FILE_RE = re.compile(r"^=== FILE: (.+?) ===[ \t]*$", re.MULTILINE)
+YAML_FENCE_RE = re.compile(r"^```ya?ml[ \t]*\n(?!---)(.*?)\n```[ \t]*\n", re.DOTALL)
+TYPE_BY_DIR = {"entities": "Entity", "concepts": "Concept", "syntheses": "Synthesis"}
 SECTIONS = {
     "entities": "Entities",
     "concepts": "Concepts",
@@ -45,18 +47,41 @@ class IngestError(Exception):
 
 
 # ── Pure helpers ────────────────────────────────────────────────────
-def split_frontmatter(md: str) -> Tuple[dict, str]:
+def split_frontmatter(md: str, default_type: Optional[str] = None) -> Tuple[dict, str]:
     text = md.strip() + "\n"
-    m = re.match(r"^---\n(.*?)\n---[ \t]*\n", text, re.DOTALL)
+    m = re.match(r"^---[ \t]*\n(.*?)\n---[ \t]*\n", text, re.DOTALL)
     if not m:
         raise ValueError("no YAML frontmatter")
     try:
         meta = yaml.safe_load(m.group(1))
     except yaml.YAMLError as e:
         raise ValueError(f"invalid frontmatter: {e}")
-    if not isinstance(meta, dict) or not meta.get("type"):
-        raise ValueError("frontmatter needs a non-empty 'type'")
+    if not isinstance(meta, dict):
+        raise ValueError("frontmatter is not a mapping")
+    if not meta.get("type"):
+        if not default_type:
+            raise ValueError("frontmatter needs a non-empty 'type'")
+        meta["type"] = default_type
     return meta, text[m.end():].lstrip("\n")
+
+
+def page_from_model(md: str, default_type: Optional[str]) -> Tuple[dict, str]:
+    """Split a model-written page, repairing the usual frontmatter mistakes.
+
+    Models often drop the `type` or omit the frontmatter entirely (```yaml
+    fences are repaired in parse_files). The bot writes timestamp/sources
+    itself, so it can derive the rest from the page's folder and first heading.
+    """
+    text = md.strip()
+    if re.match(r"^---[ \t]*\n", text):
+        return split_frontmatter(text, default_type)
+    if not default_type:
+        raise ValueError("no YAML frontmatter")
+    meta = {"type": default_type}
+    h1 = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
+    if h1:
+        meta["title"] = h1.group(1).strip()
+    return meta, text
 
 
 def render_page(meta: dict, body: str) -> str:
@@ -82,10 +107,12 @@ def strip_fences(text: str) -> str:
 
 
 def parse_files(raw: str) -> Dict[str, str]:
-    raw = strip_fences(raw)
+    raw = strip_fences(raw.replace("\r\n", "\n"))
     parts = FILE_RE.split(raw)  # [pre, path, body, path, body ...]
     files: Dict[str, str] = {}
     for path, body in zip(parts[1::2], parts[2::2]):
+        # frontmatter fenced as ```yaml without --- lines: turn it into real frontmatter
+        body = YAML_FENCE_RE.sub(r"---\n\1\n---\n", body.strip(), count=1)
         files[path.strip()] = strip_fences(body)
     return files
 
@@ -293,11 +320,12 @@ class WikiService:
                         raise IngestError(f"The model proposed an invalid path: {path}")
                     if path in snap:
                         raise IngestError(f"The model tried to overwrite a page it was not shown: {path}")
+                old_meta = split_frontmatter(existing[path])[0] if is_update else {}
+                default_type = old_meta.get("type") or TYPE_BY_DIR.get(path.split("/")[1])
                 try:
-                    llm_meta, body = split_frontmatter(md)
+                    llm_meta, body = page_from_model(md, default_type)
                 except ValueError as e:
                     raise IngestError(f"{path}: {e}")
-                old_meta = split_frontmatter(existing[path])[0] if is_update else {}
                 sources = [s for s in old_meta.get("sources", []) if isinstance(s, dict)]
                 meta = {**old_meta, **{k: v for k, v in llm_meta.items() if k not in ("sources", "timestamp")}}
                 meta["timestamp"] = now.isoformat()
