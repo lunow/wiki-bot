@@ -1,6 +1,10 @@
+import logging
+
 import httpx
 from typing import Dict, Optional, Any, List
 from .posthog_tracker import LLMTracker
+
+logger = logging.getLogger(__name__)
 
 
 class LLMClient:
@@ -119,7 +123,12 @@ class LLMClient:
                 )
                 resp.raise_for_status()
                 data = resp.json()
-                text = data.get("text", "")
+                text = (data.get("text") or "").strip()
+                # Sizes only, no content: tells silent audio apart from decoding problems
+                logger.info(
+                    f"Transcription: {len(audio_bytes)} bytes, "
+                    f"{(data.get('usage') or {}).get('seconds')}s audio, {len(text)} chars"
+                )
                 # Whisper doesn't return usage; estimate ~10 tokens/sec
                 tracker.track_success(
                     messages=[{"role": "user", "content": "[audio transcription request]"}],

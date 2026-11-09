@@ -282,6 +282,10 @@ async def handle_voice(chat_id: int, voice: dict):
             properties={"transcript_length": len(transcribed)},
         )
 
+        if not transcribed:
+            await send_message(chat_id, "🎙️ I couldn't make out any speech in that voice message. Please try again.")
+            return
+
         # Send the transcription back so the user knows what was understood
         await send_message(chat_id, f'📝 I heard: *"{transcribed}"*')
 
