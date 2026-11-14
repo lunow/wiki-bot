@@ -113,9 +113,20 @@ async def download_telegram_file(file_id: str) -> tuple[bytes, str]:
 
 
 # ── JEV & Intent ────────────────────────────────────────────────────
+INTENTS = ("QUERY", "INGEST", "CHAT")
+INTENT_RE = re.compile(r'"intent"\s*:\s*"(QUERY|INGEST|CHAT)"', re.IGNORECASE)
+
+
+def heuristic_intent(text: str) -> str:
+    """Fallback when the classifier is unavailable or its answer can't be parsed."""
+    if "?" in text or re.search(r"\b(when|how much|how many|what|where|why|who|which)\b", text.lower()):
+        return "QUERY"
+    return "INGEST"
+
+
 async def classify_intent(text: str, chat_id: int) -> str:
-    """JEV: Judge Every incoming message. Returns QUERY, INGEST, or UNCLEAR."""
-    system = "You are a strict intent classifier. Output exactly one word: QUERY, INGEST, or UNCLEAR. No punctuation, no explanation."
+    """JEV: Judge Every incoming message. Returns QUERY, INGEST, or CHAT; never asks the user."""
+    system = "You are an intent router. Think briefly, then answer with a single JSON object and nothing else."
     user = JEV_PROMPT.format(text=text, domain=WIKI_DOMAIN)
     try:
         result = await llm.chat(
@@ -127,14 +138,25 @@ async def classify_intent(text: str, chat_id: int) -> str:
         )
     except Exception as e:
         logger.error(f"JEV call failed: {e}")
-        return "UNCLEAR"
-    raw = result.strip().upper().rstrip(".")
-    if raw in ("QUERY", "INGEST", "UNCLEAR"):
+        return heuristic_intent(text)
+    match = INTENT_RE.search(result)
+    if match:
+        return match.group(1).upper()
+    # Tolerate a bare one-word answer
+    raw = result.strip().strip("`\"'. ").upper()
+    if raw in INTENTS:
         return raw
-    logger.warning(f"JEV returned unexpected value: {result!r}, falling back to heuristics")
-    if "?" in text or re.search(r"\b(when|how much|how many|what|where|why|who|which)\b", text.lower()):
-        return "QUERY"
-    return "INGEST"
+    logger.warning(f"JEV returned unexpected value ({len(result)} chars), falling back to heuristics")
+    return heuristic_intent(text)
+
+
+async def route(chat_id: int, text: str, intent: str, *, label: str = "Telegram note", author: str = ""):
+    if intent == "QUERY":
+        await handle_query(chat_id, text)
+    elif intent == "INGEST":
+        await handle_ingest(chat_id, text, label=label, author=author)
+    else:
+        await handle_chat(chat_id)
 
 
 # ── Handlers ────────────────────────────────────────────────────────
@@ -310,12 +332,7 @@ async def handle_voice(chat_id: int, voice: dict, author: str = ""):
             properties={"intent": intent, "transcript_length": len(transcribed)},
         )
 
-        if intent == "QUERY":
-            await handle_query(chat_id, transcribed)
-        elif intent == "INGEST":
-            await handle_ingest(chat_id, transcribed, label="Telegram voice note", author=author)
-        else:
-            await handle_unclear(chat_id, transcribed)
+        await route(chat_id, transcribed, intent, label="Telegram voice note", author=author)
 
     except Exception as e:
         logger.error(f"Voice handling failed: {e}")
@@ -327,20 +344,14 @@ async def handle_voice(chat_id: int, voice: dict, author: str = ""):
         await send_message(chat_id, f"❌ Sorry, I couldn't process the voice message: {e}")
 
 
-async def handle_unclear(chat_id: int, text: str):
-    """Ask the user to clarify whether they want to ask or save."""
-    msg = (
-        "🤔 I'm not sure if you're *asking* something or *telling* me something new.\n\n"
-        "Reply with:\n"
-        "• ask: your question\n"
-        "• save: your note"
+async def handle_chat(chat_id: int):
+    """Small talk: nothing to look up or store, so explain what the bot does."""
+    await send_message(
+        chat_id,
+        f"👋 I'm {BOT_NAME}. Tell me anything worth remembering about {WIKI_DOMAIN} and I'll add it "
+        "to the wiki, or ask me a question and I'll answer from it.",
     )
-    await send_message(chat_id, msg)
-    track_event(
-        distinct_id=chat_id,
-        event="intent_unclear",
-        properties={"text_length": len(text)},
-    )
+    track_event(distinct_id=chat_id, event="intent_chat", properties={})
 
 
 async def run_reminder(name: str):
@@ -476,7 +487,7 @@ async def process_update(data: dict):
         if not text:
             return
 
-        # Explicit prefixes skip the classifier
+        # Optional ask:/save: prefixes skip the classifier
         prefix = re.match(r"^\s*(ask|save)\s*:\s*(.+)$", text, re.IGNORECASE | re.DOTALL)
         if prefix:
             intent = "QUERY" if prefix.group(1).lower() == "ask" else "INGEST"
@@ -490,12 +501,7 @@ async def process_update(data: dict):
             properties={"intent": intent, "text_length": len(text)},
         )
 
-        if intent == "QUERY":
-            await handle_query(chat_id, text)
-        elif intent == "INGEST":
-            await handle_ingest(chat_id, text, author=author)
-        else:
-            await handle_unclear(chat_id, text)
+        await route(chat_id, text, intent, author=author)
     except Exception as e:
         logger.exception("Update processing failed")
         track_event(distinct_id=chat_id, event="update_error", properties=error_props(e))

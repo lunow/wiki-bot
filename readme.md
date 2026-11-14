@@ -99,18 +99,20 @@ curl https://recipes-bot.example.com/health          # {"status":"ok"}
 curl -H "Authorization: Bearer $ADMIN_TOKEN" https://recipes-bot.example.com/trigger-remind/weekly
 ```
 
-Then in Telegram: `ask: what do we have so far?`, then save a note and check the new commit in the repo.
+Then in Telegram: ask `what do we have so far?`, then send a note and check the new commit in the repo.
 
 ## Using the bot
+
+No commands or prefixes needed: an LLM reads each message and decides whether you're asking something or telling it something to remember.
 
 | You send | The bot |
 |---|---|
 | A question | Reads `index.md`, picks the relevant pages, answers with page citations |
 | A statement or note | Merges it into existing pages (or creates new ones), updates `index.md` and `log.md`, commits once, replies with what it created or updated |
-| `ask: …` / `save: …` | Skips classification and does exactly that |
 | A photo (+ caption) | Stores the image under `wiki/references/images/` and documents it from the caption (the bot cannot see the image) |
 | A voice message | Transcribes (Whisper), shows what it heard, then handles it like text |
-| Something ambiguous | Asks you to use `ask:` or `save:` |
+| Small talk ("hi", "thanks", /start) | Replies briefly with what it can do; nothing is saved |
+| `ask: …` / `save: …` *(optional)* | Skips the decision and does exactly that, if the bot ever guesses wrong |
 
 If an ingest is rejected (invalid output from the model, a path outside the allowed folders, an attempt to overwrite an unseen page), the bot says so and **nothing is committed**.
 
@@ -122,7 +124,7 @@ LLM calls arrive as `$ai_generation` events; actions arrive as business events. 
 |---|---|
 | `$ai_generation` | model, provider, latency, tokens, estimated cost (known models), content sizes |
 | `telegram_message_received` | text_length, chat_type, has_photo/voice/caption |
-| `intent_classified`, `intent_classified_voice`, `intent_unclear` | intent, lengths |
+| `intent_classified`, `intent_classified_voice`, `intent_chat` | intent, lengths |
 | `query_received`, `wiki_retrieved`, `query_answered` | lengths, page_count |
 | `ingest_received`, `ingest_committed`, `ingest_rejected`, `ingest_commit_error` | content_length, created_count, updated_count, error_type |
 | `photo_received`, `photo_error` | has_caption, caption_length, error_type |
@@ -146,7 +148,7 @@ Every event carries `instance` when `INSTANCE_NAME` is set, so one project can h
 | GitHub errors | PAT lacks Contents read+write, wrong `GITHUB_REPO` / `GITHUB_BRANCH`, or branch protection blocks direct pushes |
 | LLM errors | Check the key and `LLM_BASE_URL` / `LLM_MODEL` |
 | Voice fails | Check `WHISPER_MODEL` exists on your endpoint; if `WHISPER_API_KEY` is set it must be an OpenAI key |
-| Wrong routing | Use the `ask:` / `save:` prefix, or tune `JEV_PROMPT` in `app/prompts.py` |
+| Wrong routing | Rephrase, or force it with an `ask:` / `save:` prefix; tune `JEV_PROMPT` in `app/prompts.py` if it happens often |
 | PostHog empty | Check `POSTHOG_API_KEY` and `POSTHOG_HOST` |
 
 ## Backlog

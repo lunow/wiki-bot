@@ -90,16 +90,19 @@ Body text in Markdown.
 
 No code fences, no commentary outside the file blocks."""
 
-JEV_PROMPT = """You are the intent classifier for a Telegram bot about {domain}.
+JEV_PROMPT = """You route messages for a Telegram bot that keeps a shared knowledge base about {domain}.
 
-The bot can do two things:
-- **QUERY**: Answer questions from a knowledge base (e.g., a question about facts, dates, amounts or status)
-- **INGEST**: Save new information into the knowledge base (e.g., a statement of something that happened, was decided, bought, learned or needs doing)
+Decide what the sender wants:
+- **QUERY**: they want information from the knowledge base. Questions, requests to look something up, summarise, list or remind them of what is known ("when is the next meetup?", "who leads the mentoring program", "summarise what we know about Anna").
+- **INGEST**: they are telling the bot something worth keeping. Facts, events, decisions, plans, dates, people, contacts, links, ideas, to-dos, corrections, or anything phrased as "remember / note / save that ..." ("the next meetup is on 20 November in Berlin", "Anna joined as co-organizer", "remind me that the venue needs a deposit").
+- **CHAT**: neither. Greetings, thanks, reactions ("ok", "great"), bot commands like /start, or questions about the bot itself ("what can you do?").
 
-Classify the user's message. Respond with exactly one word and nothing else:
-- QUERY
-- INGEST
-- UNCLEAR
+How to decide:
+- Judge the intent, not the punctuation. A statement without a question mark can be a request ("tell me about the budget"), and a question can carry new information.
+- If the message shares concrete new information (names, dates, numbers, places, links, decisions), choose INGEST, even if it also contains a question.
+- Choose CHAT only when the message has no information to store and nothing to look up.
 
-User message: {text}
-Intent:"""
+Reply with JSON only, reasoning first: {{"reason": "<one short sentence>", "intent": "QUERY" | "INGEST" | "CHAT"}}
+
+Message:
+{text}"""

@@ -6,7 +6,7 @@ A Telegram bot in front of an **LLM-wiki** (OKF v0.1 markdown bundle in the `wik
 Telegram ──► wiki-bot-service (one container per wiki)
                │
                ├── POST /telegram  (secret header → ack → background task)
-               │     ├── text   → prefix ask:/save:  or  JEV → QUERY | INGEST | UNCLEAR
+               │     ├── text   → prefix ask:/save:  or  JEV → QUERY | INGEST | CHAT
                │     ├── photo  → download → ingest (image + pages in one commit)
                │     └── voice  → download → Whisper → same routing as text
                │
@@ -34,7 +34,7 @@ One container. No database. All state lives in the GitHub repo.
 | **Bot owns bookkeeping** | Provenance (`sources` + `sha256`), `timestamp`, `index.md` and `log.md` are written by code, not the model, and the model's output is validated before anything is committed |
 | **One atomic commit per ingest** | Git Data API (tree + commit + fast-forward ref update): pages, index, log and any image land together or not at all |
 | **Raw notes optional** | `SAVE_RAW_NOTES` keeps each note as a Source page (provenance, verbatim text); turn it off for a leaner repo |
-| **JEV routing** | An LLM call classifies each message. `ask:` / `save:` prefixes skip it. UNCLEAR asks the user to use a prefix. |
+| **JEV routing** | An LLM call reasons briefly and returns JSON `{reason, intent}`: QUERY, INGEST or CHAT (small talk, short reply). It always decides; if the call fails or can't be parsed, a keyword heuristic decides. Optional `ask:` / `save:` prefixes skip it. |
 | **Reminders are configuration** | A JSON list of `{name, cron, focus, title}`; none by default |
 | **OpenRouter for LLM and Whisper** | One key for chat and voice (`openai/whisper-large-v3` via `/audio/transcriptions`); `WHISPER_API_KEY` switches voice to OpenAI |
 | **GitHub as source of truth** | Everything versioned and reviewable |
@@ -51,7 +51,7 @@ Telegram update
   └── text
         ├── "ask: …"        → QUERY
         ├── "save: …"       → INGEST
-        └── otherwise       → JEV → QUERY | INGEST | UNCLEAR
+        └── otherwise       → JEV → QUERY | INGEST | CHAT
 ```
 
 ## Ingest pipeline (details)

@@ -8,7 +8,7 @@ A Telegram bot in front of an **LLM-wiki** (an [OKF v0.1](https://github.com/Goo
 - **Save** — a note is merged into existing pages (or creates new ones). The bot adds provenance (including the Telegram sender), updates `index.md` and `log.md`, and commits everything in a single commit.
 - **Photos** — saved under `wiki/references/images/`, documented from the caption.
 - **Voice** — transcribed with Whisper, then routed like text.
-- **Routing** — an LLM classifies each text message as a question or a note. Prefix `ask:` / `save:` to force it.
+- **Routing** — an LLM reasons about each message and decides: question (answer it), note (save it) or small talk (short reply). It never asks you to choose; an optional `ask:` / `save:` prefix overrides it.
 - **Reminders** — optional scheduled digests, defined by you (see below).
 - **PostHog** — privacy-filtered observability (pseudonymous IDs, no content by default).
 
@@ -121,4 +121,4 @@ curl -X POST localhost:8000/telegram -H "Content-Type: application/json" \
 | Reminders not firing | Check `REMINDERS` JSON and `TZ`; startup fails loudly on invalid JSON |
 | GitHub errors | PAT lacks Contents read+write, or `GITHUB_REPO` / `GITHUB_BRANCH` is wrong |
 | Voice fails | Check `WHISPER_MODEL` exists on your endpoint; if `WHISPER_API_KEY` is set it must be an OpenAI key |
-| Wrong routing | Use the `ask:` / `save:` prefix, or tune `JEV_PROMPT` |
+| Wrong routing | Force it with an `ask:` / `save:` prefix, or tune `JEV_PROMPT` |
