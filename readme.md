@@ -1,6 +1,25 @@
-# Setup Guide — Wiki Bot
+# Wiki Bot
 
-A Telegram bot for an LLM-wiki in a GitHub repo. One deployment serves one wiki; repeat the steps for each additional wiki. Architecture and decisions: [PLAN.md](PLAN.md). All settings: [wiki-bot-service/README.md](wiki-bot-service/README.md).
+A Telegram bot that turns a group's chat into a shared knowledge base. Send it a note, and it files the note into a markdown wiki in a GitHub repo. Ask it a question, and it answers from that wiki with links to the pages it used.
+
+## How it works
+
+- **The wiki is plain markdown in Git.** It lives in the `wiki/` folder of a repo you own (an [OKF v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog) bundle: entities, concepts, syntheses, references, an index and a log). You can read, edit and review it like any other repo.
+- **Saving a note** sends it to an LLM. The model merges the note into existing pages or creates new ones, keeps `index.md` and `log.md` up to date, and commits everything in one commit. The raw note is kept as a source page that records who sent it and when.
+- **Asking a question** reads `index.md`, lets the model pick the relevant pages, and answers from only those.
+- **Voice messages** are transcribed (Whisper via OpenRouter, using the same key) and handled like text. **Photos** are stored and described from their caption.
+- **Nothing is committed if the result is invalid.** That covers broken model output, a path outside the wiki folders, and an attempt to overwrite a page the model hasn't seen.
+- **One deployment serves one wiki.** Each wiki gets its own Telegram bot and its own environment variables, so the same code can run any number of wikis on different subjects.
+
+The stack is a FastAPI webhook service in one Docker image. It needs a GitHub token, an OpenRouter (or other OpenAI-compatible) key and a Telegram bot. PostHog analytics are optional.
+
+More detail: [PLAN.md](PLAN.md) covers the architecture and decisions, and [wiki-bot-service/README.md](wiki-bot-service/README.md) lists every setting.
+
+---
+
+# Setup Guide
+
+Repeat these steps for each wiki.
 
 ## What you need (per wiki)
 
@@ -61,7 +80,7 @@ ENV_FILE=envs/recipes.env HOST_PORT=8002 docker compose -p wiki-recipes up -d --
 
 Put a reverse proxy with HTTPS in front of `127.0.0.1:8002`. Use a different `-p` name and `HOST_PORT` for every wiki.
 
-**Coolify:** create one service per wiki from the same Git source (root `Bot/wiki-bot-service`), paste the env file contents into the environment panel, assign the domain.
+**Coolify:** create one service per wiki from the same Git source (Dockerfile build pack, base directory `/wiki-bot-service`, port 8000), paste the env file contents into the environment panel, assign the domain.
 
 On startup the bot registers its Telegram webhook with the secret. Check the logs for `Config:` warnings, which list missing required settings.
 

@@ -5,7 +5,7 @@ A Telegram bot in front of an **LLM-wiki** (an [OKF v0.1](https://github.com/Goo
 ## What it does
 
 - **Ask** — a question is answered from the wiki. The bot reads `wiki/index.md`, lets the LLM pick the relevant pages, and answers from only those (small wikis, ≤ 8 pages, are loaded whole).
-- **Save** — a note is merged into existing pages (or creates new ones). The bot adds provenance, updates `index.md` and `log.md`, and commits everything in a single commit.
+- **Save** — a note is merged into existing pages (or creates new ones). The bot adds provenance (including the Telegram sender), updates `index.md` and `log.md`, and commits everything in a single commit.
 - **Photos** — saved under `wiki/references/images/`, documented from the caption.
 - **Voice** — transcribed with Whisper, then routed like text.
 - **Routing** — an LLM classifies each text message as a question or a note. Prefix `ask:` / `save:` to force it.
